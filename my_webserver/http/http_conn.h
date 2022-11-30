@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-22 13:30:28
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-22 16:01:42
+ * @LastEditTime: 2022-11-24 11:03:06
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/http/http_conn.h
@@ -36,7 +36,7 @@
 class http_conn
 {
 public:
-    static const int FIIENAME_LEN = 200;
+    static const int FILENAME_LEN = 200;
     static const int READ_BUFFER_SIZE = 4096;
     static const int WRITE_BUFFER_SIZE = 1024;
     //枚举从0开始递增
@@ -65,7 +65,7 @@ private:
     HTTP_CODE process_read();
     HTTP_CODE process_write(HTTP_CODE ret);
     HTTP_CODE parse_request_line(char *text);
-    HTTP_CODE parse_header(char *text);
+    HTTP_CODE parse_headers(char *text);
     HTTP_CODE parse_content(char *text);
     HTTP_CODE do_request();
     char*get_line(){
@@ -83,12 +83,12 @@ private:
     bool add_blank_line();
 
 public:
-    static int m_epoolfd;
-    static int my_user_count;
+    static int m_epollfd;
+    static int m_user_count;
     MYSQL *mysql;
 
 private:
-    int m_mysockfd;
+    int m_sockfd;
     int m_address;
     char m_read_buf[READ_BUFFER_SIZE];
     int m_read_idx;
@@ -98,7 +98,7 @@ private:
     int m_write_idx;
     CHECK_STATE m_check_state;
     METHOD m_method;
-    char m_read_file[FILENAME_LEN];
+    char m_real_file[FILENAME_LEN];
     char *m_url;
     char*m_version;
     char*m_host;

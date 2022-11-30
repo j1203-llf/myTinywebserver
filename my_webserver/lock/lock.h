@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-21 10:38:44
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-22 14:21:17
+ * @LastEditTime: 2022-11-28 10:50:17
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/lock/lock.h
@@ -32,7 +32,7 @@ public:
     bool lock(){
         return pthread_mutex_lock(&m_mutex) == 0;
     }
-    bool unlook(){
+    bool unlock(){
         return pthread_mutex_unlock(&m_mutex) == 0;
     }
     pthread_mutex_t*get(){
