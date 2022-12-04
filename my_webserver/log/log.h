@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-27 16:50:22
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-30 10:42:51
+ * @LastEditTime: 2022-12-01 14:22:07
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/log/log.h
@@ -57,7 +57,7 @@ class Log
         locker m_mutex;
 };
 #define LOG_DEBUG(format, ...) Log::get_instance()->write_log(0, format, __VA_ARGS__)
-#define LOG_DEBUG(format,...)Log::get_instance()->write_log(1,format,__VA_ARGS__)
-#define LOG_DEBUG(format,...)Log::get_instance()->write_log(2,format,__VA_ARGS__)
-#define LOG_DEBUG(format,...)Log::get_instance()->write_log(3,format,__VA_ARGS__)
+#define LOG_INFO(format,...)Log::get_instance()->write_log(1,format,__VA_ARGS__)
+#define LOG_WARN(format,...)Log::get_instance()->write_log(2,format,__VA_ARGS__)
+#define LOG_ERROR(format,...)Log::get_instance()->write_log(3,format,__VA_ARGS__)
 #endif

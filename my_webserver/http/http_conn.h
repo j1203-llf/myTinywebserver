@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-22 13:30:28
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-24 11:03:06
+ * @LastEditTime: 2022-12-01 11:14:30
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/http/http_conn.h
@@ -40,10 +40,41 @@ public:
     static const int READ_BUFFER_SIZE = 4096;
     static const int WRITE_BUFFER_SIZE = 1024;
     //枚举从0开始递增
-    enum METHOD(GET = 0, POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATH);
-    enum CHECK_STATE(CHECK_STATE_REQUESTLINE = 0, CHECK_STATE_HEADER, CHECK_STATE_CONTENT);
-    enum HTTP_CODE(NO_REQUEST, GET_REQUEST, BAD_REQUEST, NO_RESOURCE, FORBIDDEN_REQUEST, FILE_REQUEST, INTERNAL_ERROR, CLOSED_CONNECTION);
-    enum LINE_STATE(LINE_OK = 0, LINE_BAD, LINE_OPEN);
+ enum METHOD
+    {
+        GET = 0,
+        POST,
+        HEAD,
+        PUT,
+        DELETE,
+        TRACE,
+        OPTIONS,
+        CONNECT,
+        PATH
+    };
+    enum CHECK_STATE
+    {
+        CHECK_STATE_REQUESTLINE = 0,
+        CHECK_STATE_HEADER,
+        CHECK_STATE_CONTENT
+    };
+    enum HTTP_CODE
+    {
+        NO_REQUEST,
+        GET_REQUEST,
+        BAD_REQUEST,
+        NO_RESOURCE,
+        FORBIDDEN_REQUEST,
+        FILE_REQUEST,
+        INTERNAL_ERROR,
+        CLOSED_CONNECTION
+    };
+    enum LINE_STATUS
+    {
+        LINE_OK = 0,
+        LINE_BAD,
+        LINE_OPEN
+    };
 
 
 
@@ -63,15 +94,15 @@ public:
 private:
     void init();
     HTTP_CODE process_read();
-    HTTP_CODE process_write(HTTP_CODE ret);
+    bool process_write(HTTP_CODE ret);
     HTTP_CODE parse_request_line(char *text);
     HTTP_CODE parse_headers(char *text);
     HTTP_CODE parse_content(char *text);
     HTTP_CODE do_request();
     char*get_line(){
         return m_read_buf + m_start_line;
-    }
-    LINE_STATE parse_line();
+    };
+    LINE_STATUS parse_line();
     void unmap();
     bool add_respose(const char *format, ...);
     bool add_content(const char *content);
@@ -89,7 +120,7 @@ public:
 
 private:
     int m_sockfd;
-    int m_address;
+   sockaddr_in m_address;
     char m_read_buf[READ_BUFFER_SIZE];
     int m_read_idx;
     int m_checked_idx;
@@ -106,7 +137,7 @@ private:
     bool m_linger;//对于post请求的connection的方式选择是keep-alive还是close
     
     char *m_file_address;
-    LINE_STATE m_file_stat;
+    struct stat m_file_stat;
    struct iovec m_iv[2];
     int m_iv_count;
     int cgi;//是否启用post

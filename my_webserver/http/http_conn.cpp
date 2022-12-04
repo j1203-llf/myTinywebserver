@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-22 13:29:12
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-27 10:28:26
+ * @LastEditTime: 2022-12-01 11:13:27
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/http/http_conn.cpp
@@ -35,13 +35,13 @@ const char *error_500_form = "There was an unusual problem serving the request f
 const char *doc_root = "/home/llf/centerya/te/study/TinyWebServer-raw_version";
 
 map<string, string> users;
-locker lock;
+locker m_lock;
 
 void http_conn::initmysql_result(connection_pool *connPool)
 {
     //先从连接池中取一个连接
     MYSQL *mysql = NULL;
-    connectionRAII mysqlcon(&mysql, connPool);
+    connectionRAII mysqlcon(&mysql, connPool);//RAII机制，创建临时变量管理内存
 
     //在user表中检索username，passwd数据，浏览器端输入
     if (mysql_query(mysql, "SELECT username,passwd FROM user"))
@@ -67,10 +67,10 @@ void http_conn::initmysql_result(connection_pool *connPool)
     }
 }
 int settingnonblock(int fd){
-    int falg = fcntl(fd, F_GETFL);
+    int flag = fcntl(fd, F_GETFL);
     flag |= O_NONBLOCK;
     fcntl(fd, F_SETFL, flag);
-    return falg;
+    return flag;
 }
 
 void addfd(int epollfd,int fd,bool one_shot){
@@ -83,14 +83,14 @@ void addfd(int epollfd,int fd,bool one_shot){
     event.events = EPOLLIN | EPOLLRDHUP;
     #endif
     #ifdef connfdLT
-    event.events = EPOLLIN | EPOLLLT | EPOLLRDHUP;
+    event.events = EPOLLIN | EPOLLRDHUP;
     #endif
     #ifdef listenfdLT
     event.events = EPOLLIN | EPOLLRDHUP;
     #endif
     if(one_shot){
         event.events |= EPOLLONESHOT;
-        epoll_ctrl(epoolfd, EPOLL_CTL_ADD, fd, &event);
+        epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
         settingnonblock(fd);
     }
 }
@@ -110,7 +110,7 @@ event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
     event.events = ev | EPOLLONESHOT | EPOLLRDBAND;
 #endif
 
-    epoll_ctrl(epollfd, EPOLL_CTL_MOD, fd, &event);
+    epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
 }
 
 int http_conn::m_user_count = 0;
@@ -118,7 +118,7 @@ int http_conn::m_epollfd = -1;
 
 void http_conn::close_conn(bool real_close){
     if(real_close&&(m_sockfd!=-1)){
-        remove(m_epollfd, m_sockfd);
+        removefd(m_epollfd, m_sockfd);
         m_sockfd = -1;
         m_user_count--;
     }
@@ -127,7 +127,7 @@ void http_conn::close_conn(bool real_close){
 void http_conn::init(int sockfd,const sockaddr_in &addr){
     m_sockfd = sockfd;
     m_address = addr;
-    add(m_epollfd, sockfd, true);
+    addfd(m_epollfd, sockfd, true);
     m_user_count++;
     init();
 }
@@ -226,25 +226,25 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char*text){
         return BAD_REQUEST;
     }
     *m_version++ = '\0';
-    m_version = strspn(text, "\t");
+    m_version += strspn(text, "\t");
     if(strcasecmp(m_version,"http/1.1")!=0)
         return BAD_REQUEST;
 
-    if(strcasecmp(m_version,"http://",7)==0){
+    if(strncasecmp(m_version,"http://",7)==0){
         m_url += 7;
-        m_url = strchr(m_url, "/");
+        m_url = strchr(m_url, '/');
     }
 
-    if(strcasecmp(m_url,"https://",8)==0){
-        murl += 8;
-        m_url = strchr(m_version, "/");
+    if(strncasecmp(m_url,"https://",8)==0){
+        m_url += 8;
+        m_url = strchr(m_version, '/');
     }
 
     if(!m_url||m_url[0]!='/')
         return BAD_REQUEST;
     if(strlen(m_url)==1)
         strcat(m_url, "judge.html");
-    m_check_states = CHECK_STATE_HEADER;
+    m_check_state = CHECK_STATE_HEADER;
     return NO_REQUEST;
 }
 //主状态机分析请求头
@@ -256,22 +256,22 @@ http_conn::HTTP_CODE http_conn::parse_headers(char*text){
         }
         return GET_REQUEST;
     }
-    else if(strcasecmp(text,"connection:",11)==0){
+    else if(strncasecmp(text,"connection:",11)==0){
         text += 11;
         text += strspn(text, "\t");
         if(strcasecmp(text,"keep-alive")==0){
             m_linger = true;
         }
     }
-    else if(strcasecmp(text,"Content-length:",15)==0){
+    else if(strncasecmp(text,"Content-length:",15)==0){
         text += 15;
         text += strspn(text, "\t");
         m_content_length = atol(text);
     }
-    else if(strcasecmp(text,"Host:",5)==0){
+    else if(strncasecmp(text,"Host:",5)==0){
         text += 5;
         text += strspn(text, "\t");
-        m_host = true;
+        m_host = text;
     }
     else{
         LOG_INFO("未知请求头：%s", text);
@@ -303,11 +303,8 @@ void http_conn::process(){
     modfd(m_epollfd, m_sockfd, EPOLLOUT);
 }
 //将主状态机封装，并读主状态机数据(http请求报文)
-char*get_line(){
-    return m_read_buf + m_start_line;
-}
 http_conn::HTTP_CODE http_conn::process_read(){
-    LINE_STATE line_status = LINE_OK;
+    LINE_STATUS line_status = LINE_OK;
     HTTP_CODE ret = NO_REQUEST;
     char *text = 0;
     while((m_check_state==CHECK_STATE_CONTENT&&line_status==LINE_OK)||(line_status=parse_line())==LINE_OK)
@@ -469,8 +466,64 @@ http_conn::HTTP_CODE http_conn::do_request(){
     
     return FILE_REQUEST;
 }
+void http_conn::unmap()
+{
+    if (m_file_address)
+    {
+        munmap(m_file_address, m_file_stat.st_size);
+        m_file_address = 0;
+    }
+}
 //把响应报文发到write_buffer里面所需的操作函数
 //-----------------------------------------------------------------add_respose函数可以优化initializer_list标准库类型
+//将响应报文发给浏览器端
+bool http_conn::write(){
+    int temp = 0;
+    int newadd = 0;
+    if(bytes_to_send==0){
+        modfd(m_epollfd, m_sockfd, EPOLLIN);
+        init();
+        return true;
+    }
+    while ((1))
+    {
+        temp = writev(m_sockfd, m_iv, m_iv_count);
+        if(temp>0){
+            bytes_have_send += temp;
+            newadd = bytes_have_send - m_write_idx;
+        }
+        if(temp<=-1){
+                if(errno==EAGAIN){
+                    if(bytes_have_send>=m_iv[0].iov_len){
+                        m_iv[0].iov_len = 0;
+                        m_iv[1].iov_base = m_file_address + newadd;
+                        m_iv[1].iov_len = bytes_to_send;
+                    }
+                    else{
+                        m_iv[0].iov_base = m_write_buf + bytes_to_send;
+                        m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;
+                    }
+                    modfd(m_epollfd, m_sockfd, EPOLLOUT);
+                    return true;
+                }
+                unmap();
+                return false;
+        }
+        bytes_to_send -= temp;
+        if(bytes_to_send<=0){
+            unmap();
+            modfd(m_epollfd, m_sockfd, EPOLLIN);
+            if(m_linger){
+                init();
+                return true;
+            }
+            else{
+                return false;
+            }
+        }
+    }
+}
+
 bool http_conn::add_respose(const char*format,...){
     if(m_write_idx>=WRITE_BUFFER_SIZE)
         return false;
@@ -526,14 +579,14 @@ bool http_conn::process_write(HTTP_CODE ret){
                 return false;
             break;
         }
-        case BAD_REUQEST:{
+        case BAD_REQUEST:{
             add_status_line(404, error_400_title);
             add_headers(strlen(error_400_form));
             if(add_content(error_400_form))
                 return false;
             break;
         }
-        case FORBIDDEN_REQUESET:{
+        case FORBIDDEN_REQUEST:{
             add_status_line(403, error_403_title);
             add_headers(strlen(error_403_form));
             if(!add_content(error_403_form))
@@ -567,58 +620,4 @@ bool http_conn::process_write(HTTP_CODE ret){
         m_iv[0].iov_len = m_write_idx;
         m_iv_count = 1;
         return true;
-}
-//将响应报文发给浏览器端
-bool http_conn::write(){
-    int temp = 0;
-    int newadd = 0;
-    if(bytes_to_send==0){
-        modfd(m_epollfd, m_sockfd, EPOLLIN);
-        init();
-        return true;
-    }
-    while ((1))
-    {
-        temp = writev(m_sockfd, m_iv, m_iv_count);
-        if(temp>0){
-            bytes_have_send += temp;
-            newadd = bytes_have_send - m_write_idx;
-        }
-        if(temp<=-1){
-                if(errno==EAGAIN){
-                    if(bytes_have_send>=m_iv[0].iov_len){
-                        m_iv[0].iov_len = 0;
-                        m_iv[1].iov_base = m_file_address + newadd;
-                        m_iv[1].iov_len = bytes_to_send;
-                    }
-                    else{
-                        m_iv[0].iov_base = m_write_buf + bytes_to_send;
-                        m_iv[0].iov_len = m_iv[0].iov_len - bytes_have_send;
-                    }
-                    modfd(m_epollfd, m_sockfd, EPOLLOUT);
-                    return true;
-                }
-                unmap(;
-                return false;
-        }
-        bytes_to_send -= temp;
-        if(bytes_to_send<=0){
-            unmap();
-            modfd(m_epollfd, m_sockfd, EPOLLIN);
-            if(m_linger){
-                init();
-                return true;
-            }
-            else{
-                return false;
-            }
-        }
-    }
-}
-bool http_conn::unmap(){
-     if (m_file_address)
-    {
-        munmap(m_file_address, m_file_stat.st_size);
-        m_file_address = 0;
-    }
 }

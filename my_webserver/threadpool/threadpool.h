@@ -3,7 +3,7 @@
  * @Author: LLF
  * @Date: 2022-11-21 16:51:46
  * @LastEditors: LLF
- * @LastEditTime: 2022-11-28 14:53:27
+ * @LastEditTime: 2022-12-04 11:04:57
  * @company: Intelligent Robot Lab
  * @Mailbox: 1652228242@qq.com
  * @FilePath: /my_webserver/threadpool/threadpool.h
@@ -12,7 +12,7 @@
 #ifndef THREADPOOL_
 #define THREADPOOL_
 
-#include"../CGImysql/sqo_connection_pool.h"
+#include"../CGImysql/sql_connection_pool.h"
 #include"../lock/lock.h"
 #include<cstdio>
 #include<exception>
