@@ -316,4 +316,3 @@ int main(int argc,char*argv[]){
         delete pool;
         return 0;
 }
-}
